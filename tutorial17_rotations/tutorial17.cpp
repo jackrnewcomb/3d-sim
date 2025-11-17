@@ -14,6 +14,47 @@
 #include "stb_image.h"
 GLFWwindow *window = nullptr; // define the global
 
+float lastX = 400, lastY = 300; // center of window
+bool firstMouse = true;
+float yaw = -90.0f; // horizontal rotation
+float pitch = 0.0f; // vertical rotation
+float sensitivity = 0.1f;
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed: y-coordinates go bottom -> top
+
+    lastX = xpos;
+    lastY = ypos;
+
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    glm::vec3 front;
+    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front.y = sin(glm::radians(pitch));
+    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(front);
+}
+
 int main(void)
 {
     // Initialize GLFW
@@ -55,34 +96,41 @@ int main(void)
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    GLfloat vertices[] = {
-        // Positions        // UVs
-        -1.0f, -0.5f, 0.0f, 0.0f, 0.0f, // Bottom-left
-        1.0f,  -0.5f, 0.0f, 1.0f, 0.0f, // Bottom-right
-        1.0f,  0.5f,  0.0f, 1.0f, 1.0f, // Top-right
-        -1.0f, 0.5f,  0.0f, 0.0f, 1.0f  // Top-left
+    // Scale coordinates to match field quad
+    // --- Field vertex data ---
+    float fieldWidth = 10.0f;  // X-axis width
+    float fieldLength = 50.0f; // Z-axis length
+    GLfloat fieldVertices[] = {
+        // Positions                     // UVs
+        -fieldWidth / 2, 0.0f, -fieldLength / 2, 0.0f, 0.0f, // Bottom-left
+        fieldWidth / 2,  0.0f, -fieldLength / 2, 1.0f, 0.0f, // Bottom-right
+        fieldWidth / 2,  0.0f, fieldLength / 2,  1.0f, 1.0f, // Top-right
+        -fieldWidth / 2, 0.0f, fieldLength / 2,  0.0f, 1.0f  // Top-left
     };
+    GLuint fieldIndices[] = {0, 1, 2, 2, 3, 0};
 
-    GLuint indices[] = {0, 1, 2, 2, 3, 0};
+    // --- Field VAO/VBO/EBO ---
+    GLuint fieldVAO, fieldVBO, fieldEBO;
+    glGenVertexArrays(1, &fieldVAO);
+    glGenBuffers(1, &fieldVBO);
+    glGenBuffers(1, &fieldEBO);
 
-    GLuint VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    glBindVertexArray(fieldVAO);
 
-    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, fieldVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(fieldVertices), fieldVertices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fieldEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(fieldIndices), fieldIndices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
+    // position
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-
+    // UV
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 
     // Load shaders (use your tutorial shader files)
     GLuint programID = LoadShaders("StandardShading.vertexshader", "StandardShading.fragmentshader");
@@ -92,6 +140,9 @@ int main(void)
         fprintf(stderr, "Shader program failed to load (programID == 0)\n");
         return -1;
     }
+
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // hide & capture cursor
 
     GLuint texture;
     glGenTextures(1, &texture);
@@ -155,14 +206,6 @@ int main(void)
 
     // Camera settings
     glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 5.0f);
-    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-
-    float yaw = -90.0f; // horizontal rotation
-    float pitch = 0.0f; // vertical rotation
-
-    float lastX = 400, lastY = 300; // center of window
-    bool firstMouse = true;
 
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
@@ -175,9 +218,30 @@ int main(void)
     // Optional: precompute a base field VAO scale if you want
     glm::vec3 fieldScale = glm::vec3(5.0f, 0.01f, 3.0f); // wide, thin “floor”
 
+    // Yard lines at 0, 25, 50, 25, 0 (like a V formation)
+    std::vector<float> yardLines = {0.0f, 25.0f, 50.0f, 25.0f, 0.0f};
+
+    // UAV positions container
+    std::vector<glm::vec3> UAVPositions;
+
+    // Map yard lines to Z coordinates
+    for (float yard : yardLines)
+    {
+        float zPos = (yard / 50.0f) * (fieldLength / 2.0f);                // scale to field
+        UAVPositions.push_back(glm::vec3(-fieldWidth / 2.0f, 0.0f, zPos)); // left
+        UAVPositions.push_back(glm::vec3(0.0f, 0.0f, zPos));               // middle
+        UAVPositions.push_back(glm::vec3(fieldWidth / 2.0f, 0.0f, zPos));  // right
+    }
+
     // Main render loop
     while (!glfwWindowShouldClose(window))
     {
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraFront = glm::normalize(front);
+
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -192,6 +256,8 @@ int main(void)
             cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * velocity;
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * velocity;
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, true);
 
         // Clear buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -204,43 +270,49 @@ int main(void)
         glm::mat4 View = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
         // --- Draw football field ---
-        glm::vec3 fieldScale = glm::vec3(5.0f, 1.0f, 3.0f); // wider X/Z, taller Y
         glm::mat4 fieldModel = glm::mat4(1.0f);
-        fieldModel = glm::translate(fieldModel, glm::vec3(0.0f, -0.5f, 0.0f)); // move down so top aligns with y=0
-        fieldModel = glm::scale(fieldModel, fieldScale);
-
+        fieldModel = glm::translate(fieldModel, glm::vec3(0.0f, -0.01f, 0.0f)); // slightly below UAVs
         glm::mat4 fieldMVP = Projection * View * fieldModel;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &fieldMVP[0][0]);
 
         glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glBindVertexArray(VAO);
+
+        glBindVertexArray(fieldVAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         // --- Draw chicken OBJ ---
-        glm::mat4 chickenModel = glm::mat4(1.0f);
-        chickenModel = glm::translate(chickenModel, glm::vec3(0.0f, 0.0f, 0.0f));
-        chickenModel = glm::scale(chickenModel, glm::vec3(0.01f)); // scale down large OBJ
-        chickenModel = glm::rotate(chickenModel, glm::radians(180.0f), glm::vec3(0, 1, 0));
+        for (auto &pos : UAVPositions)
+        {
+            glm::mat4 Model = glm::mat4(1.0f);
+            Model = glm::translate(Model, pos);
+            Model = glm::scale(Model, glm::vec3(0.01f)); // scale down chicken
+            Model = glm::rotate(Model, glm::radians(180.0f), glm::vec3(0, 1, 0));
 
-        glm::mat4 chickenMVP = Projection * View * chickenModel;
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &chickenMVP[0][0]);
+            glm::mat4 MVP = Projection * View * Model;
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
 
-        glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
-        glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 0.0f, 0.0f);
+            glBindVertexArray(objVAO);
+            glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
+            glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 0.0f, 0.0f);
 
-        glBindVertexArray(objVAO);
-        glDrawArrays(GL_TRIANGLES, 0, verts.size() / 3);
+            glDrawArrays(GL_TRIANGLES, 0, verts.size() / 3);
+        }
 
         // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    // Delete field buffers
+    glDeleteVertexArrays(1, &fieldVAO);
+    glDeleteBuffers(1, &fieldVBO);
+    glDeleteBuffers(1, &fieldEBO);
+
+    // Delete chicken OBJ buffers
+    glDeleteVertexArrays(1, &objVAO);
+    glDeleteBuffers(1, &objVBO);
 
     glfwTerminate();
     return 0;
