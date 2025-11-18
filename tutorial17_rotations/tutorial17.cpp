@@ -11,7 +11,9 @@
 #include "common/shader.hpp"  // LoadShaders from tutorial
 #include "common/texture.hpp" // loadBMP_custom
 #define STB_IMAGE_IMPLEMENTATION
+#include "ECE_UAV.hpp"
 #include "stb_image.h"
+
 GLFWwindow *window = nullptr; // define the global
 
 float lastX = 400, lastY = 300; // center of window
@@ -101,12 +103,11 @@ int main(void)
     float fieldWidth = 10.0f;  // X-axis width
     float fieldLength = 50.0f; // Z-axis length
     GLfloat fieldVertices[] = {
-        // Positions                     // UVs
-        -fieldWidth / 2, 0.0f, -fieldLength / 2, 0.0f, 0.0f, // Bottom-left
-        fieldWidth / 2,  0.0f, -fieldLength / 2, 1.0f, 0.0f, // Bottom-right
-        fieldWidth / 2,  0.0f, fieldLength / 2,  1.0f, 1.0f, // Top-right
-        -fieldWidth / 2, 0.0f, fieldLength / 2,  0.0f, 1.0f  // Top-left
+        // X, Y, Z,  U, V
+        -fieldWidth / 2, 0.0f, -fieldLength / 2, 0.0f, 0.0f, fieldWidth / 2,  0.0f, -fieldLength / 2, 1.0f, 0.0f,
+        fieldWidth / 2,  0.0f, fieldLength / 2,  1.0f, 1.0f, -fieldWidth / 2, 0.0f, fieldLength / 2,  0.0f, 1.0f,
     };
+
     GLuint fieldIndices[] = {0, 1, 2, 2, 3, 0};
 
     // --- Field VAO/VBO/EBO ---
@@ -219,7 +220,7 @@ int main(void)
     glm::vec3 fieldScale = glm::vec3(5.0f, 0.01f, 3.0f); // wide, thin “floor”
 
     // Yard lines at 0, 25, 50, 25, 0 (like a V formation)
-    std::vector<float> yardLines = {0.0f, 25.0f, 50.0f, 25.0f, 0.0f};
+    std::vector<float> yardLines = {0.0f, 25.0f, 50.0f, 75.0f, 100.0f};
 
     // UAV positions container
     std::vector<glm::vec3> UAVPositions;
@@ -227,15 +228,42 @@ int main(void)
     // Map yard lines to Z coordinates
     for (float yard : yardLines)
     {
-        float zPos = (yard / 50.0f) * (fieldLength / 2.0f);                // scale to field
+        float zPos = ((yard / 100.0f) * fieldLength) - fieldLength / 2.0f;
         UAVPositions.push_back(glm::vec3(-fieldWidth / 2.0f, 0.0f, zPos)); // left
-        UAVPositions.push_back(glm::vec3(0.0f, 0.0f, zPos));               // middle
-        UAVPositions.push_back(glm::vec3(fieldWidth / 2.0f, 0.0f, zPos));  // right
+        UAVPositions.push_back(glm::vec3(0.0, 0.0f, zPos));
+        UAVPositions.push_back(glm::vec3(fieldWidth / 2.0f, 0.0f, zPos)); // right
+    }
+
+    // assuming UAVPositions (std::vector<glm::vec3>) contains 15 start positions
+    std::vector<std::unique_ptr<ECE_UAV>> uavs;
+    for (int i = 0; i < (int)UAVPositions.size(); ++i)
+    {
+        auto u = std::make_unique<ECE_UAV>(UAVPositions[i]);
+        // optionally set different sphere center if needed:
+        u->sphereCenter = glm::vec3(0.0f, 50.0f, 0.0f);
+        u->ascendTarget = glm::vec3(0.0f, 50.0f, 0.0f);
+
+        u->start(); // spawns the thread
+        uavs.push_back(std::move(u));
     }
 
     // Main render loop
     while (!glfwWindowShouldClose(window))
     {
+        // in your rendering loop (run at whatever frame-rate you like)
+        static double lastPoll = glfwGetTime();
+        double now = glfwGetTime();
+        if (now - lastPoll >= 0.03)
+        { // 30 ms
+            lastPoll = now;
+            // read positions (thread-safe)
+            for (size_t i = 0; i < uavs.size(); ++i)
+            {
+                glm::vec3 p = uavs[i]->getPosition();
+                // convert simulation coords to your scene coords and draw model at 'p'
+            }
+        }
+
         glm::vec3 front;
         front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
         front.y = sin(glm::radians(pitch));
@@ -283,17 +311,20 @@ int main(void)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         // --- Draw chicken OBJ ---
-        for (auto &pos : UAVPositions)
+        for (int i = 0; i < uavs.size(); i++)
         {
+            glm::vec3 p = uavs[i]->getPosition();
+
             glm::mat4 Model = glm::mat4(1.0f);
-            Model = glm::translate(Model, pos);
-            Model = glm::scale(Model, glm::vec3(0.01f)); // scale down chicken
+            Model = glm::translate(Model, p);
+            Model = glm::scale(Model, glm::vec3(0.01f));
             Model = glm::rotate(Model, glm::radians(180.0f), glm::vec3(0, 1, 0));
 
             glm::mat4 MVP = Projection * View * Model;
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
 
             glBindVertexArray(objVAO);
+
             glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
             glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 0.0f, 0.0f);
 
@@ -303,6 +334,15 @@ int main(void)
         // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
+    }
+
+    for (auto &u : uavs)
+    {
+        u->stop();
+    }
+    for (auto &u : uavs)
+    {
+        u->join();
     }
 
     // Delete field buffers

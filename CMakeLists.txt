@@ -71,6 +71,8 @@ add_executable(tutorial17_rotations
 	common/vboindexer.hpp
 	common/quaternion_utils.cpp
 	common/quaternion_utils.hpp
+	tutorial17_rotations/ECE_UAV.hpp
+	tutorial17_rotations/ECE_UAV.cpp
 	
 	tutorial17_rotations/StandardShading.vertexshader
 	tutorial17_rotations/StandardShading.fragmentshader
