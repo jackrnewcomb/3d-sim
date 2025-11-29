@@ -216,9 +216,6 @@ int main(void)
     // --- BEFORE the main loop ---
     GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 
-    // Optional: precompute a base field VAO scale if you want
-    glm::vec3 fieldScale = glm::vec3(5.0f, 0.01f, 3.0f); // wide, thin “floor”
-
     // Yard lines at 0, 25, 50, 25, 0 (like a V formation)
     std::vector<float> yardLines = {0.0f, 10.0f, 20.0f, 30.0f, 40.0f};
 

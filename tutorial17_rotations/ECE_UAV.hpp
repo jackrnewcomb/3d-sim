@@ -1,5 +1,4 @@
 #pragma once
-// ECE_UAV.hpp  -- drop into your project and #include where needed
 
 #include <algorithm>
 #include <atomic>
@@ -33,9 +32,8 @@ struct ECE_UAV
     glm::vec3 ascendTarget = glm::vec3(0.0f, 50.0f, 0.0f); // NOTE: uses z-up convention, will adapt below
     glm::vec3 sphereCenter = glm::vec3(0.0f, 50.0f, 0.0f); // center of virtual sphere (x,y,z) with z-up
     float sphereRadius = 10.0f;
-    float waitSeconds = 5.0f;     // sat on ground
-    float sphereDuration = 60.0f; // seconds to roam on sphere surface after reaching it
-    float maxAscendSpeed = 2.0f;  // m/s (while ascending)
+    float waitSeconds = 5.0f;    // sat on ground
+    float maxAscendSpeed = 2.0f; // m/s (while ascending)
     float minTangentialSpeed = 2.0f;
     float maxTangentialSpeed = 10.0f;
     bool inSphereMode = false;
