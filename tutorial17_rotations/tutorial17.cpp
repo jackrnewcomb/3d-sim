@@ -211,7 +211,7 @@ int main(void)
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
-    float cameraSpeed = 2.5f; // units per second
+    float cameraSpeed = 7.0f; // units per second
 
     // --- BEFORE the main loop ---
     GLuint MatrixID = glGetUniformLocation(programID, "MVP");
@@ -243,7 +243,7 @@ int main(void)
         u->sphereCenter = glm::vec3(0.0f, 50.0f, 0.0f);
         u->ascendTarget = glm::vec3(0.0f, 50.0f, 0.0f);
 
-        // u->start(); // spawns the thread
+        u->start(); // spawns the thread
         uavs.push_back(std::move(u));
     }
 

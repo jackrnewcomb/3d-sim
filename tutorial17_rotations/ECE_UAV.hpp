@@ -39,6 +39,10 @@ struct ECE_UAV
     float minTangentialSpeed = 2.0f;
     float maxTangentialSpeed = 10.0f;
 
+    float wanderAngle = 0.0f;         // slowly drifting phase
+    glm::vec3 wanderDir;              // persistent tangential direction
+    float nextDirectionChange = 0.0f; // time until next direction change
+
     // internal random generator for tangential wander
     std::mt19937 rng;
     std::uniform_real_distribution<float> uniform01{0.0f, 1.0f};
@@ -225,61 +229,56 @@ inline void ECE_UAV::updatePhysics(float dt, float elapsedSinceStart)
     }
     else
     {
+        // --- PARAMETERS YOU CAN TUNE ---
+        float wanderNoise = 0.75f;    // how fast the tangential angle meanders
+        float tangentialSpeed = 8.0f; // constant speed around sphere
+        // --------------------------------
+
         // SPHERE-ROAMING phase
-        // Want to stay on sphere of radius R centered at sphereCenter
-        // Position relative to center:
         glm::vec3 rel = curPos - sphereCenter;
         float r = glm::length(rel);
         if (r < 1e-6f)
         {
-            // degenerate: push to radius in some direction
             rel = glm::vec3(0.0f, 0.0f, sphereRadius);
             r = sphereRadius;
         }
         glm::vec3 radialDir = rel / r; // outward radial
 
-        // radial correction force: try to keep r ~ sphereRadius
-        float radialError = r - sphereRadius;                       // positive => outside
-        glm::vec3 radialForce = -radialK * radialError * radialDir; // spring back to radius
+        // radial correction force (spring to radius)
+        float radialError = r - sphereRadius;
+        glm::vec3 radialForce = -radialK * radialError * radialDir;
 
-        // Compute current tangential velocity (remove radial component)
+        // remove radial velocity component (keep only tangential)
         glm::vec3 v_radial = glm::dot(curVel, radialDir) * radialDir;
         glm::vec3 v_tangential = curVel - v_radial;
-        float v_tangential_mag = glm::length(v_tangential);
 
-        // pick a target tangential speed (we can vary slowly)
-        // Use a simple deterministic pseudo-random target that changes slowly based on time
-        float tphase = elapsedSinceStart;
-        float rand01 = uniform01(rng);
-        float v_target = std::min(
-            std::max(minTangentialSpeed + (rand01 * (maxTangentialSpeed - minTangentialSpeed)), minTangentialSpeed),
-            maxTangentialSpeed);
-
-        // pick tangential direction: orthonormal vector to radialDir
-        // build an arbitrary tangent basis
+        // --- BUILD TANGENT FRAME ---
         glm::vec3 tangent1;
         if (std::abs(radialDir.z) < 0.9f)
             tangent1 = glm::normalize(glm::cross(radialDir, glm::vec3(0, 0, 1)));
         else
             tangent1 = glm::normalize(glm::cross(radialDir, glm::vec3(0, 1, 0)));
+
         glm::vec3 tangent2 = glm::normalize(glm::cross(radialDir, tangent1));
 
-        // get a slowly varying angle for direction (based on time and RNG)
-        float ang = (tphase * 0.5f) + (rand01 * 3.14f);
-        glm::vec3 desiredTangentialDir = glm::normalize(std::cos(ang) * tangent1 + std::sin(ang) * tangent2);
+        // --- WANDER: slowly drifting tangential angle ---
+        wanderAngle += ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * wanderNoise * dt;
 
-        glm::vec3 v_t_des = desiredTangentialDir * v_target;
+        glm::vec3 desiredTangentialDir =
+            glm::normalize(std::cos(wanderAngle) * tangent1 + std::sin(wanderAngle) * tangent2);
 
-        // compute acceleration needed for tangential correction
+        glm::vec3 v_t_des = desiredTangentialDir * tangentialSpeed;
+
+        // tangential acceleration
         glm::vec3 a_t = (v_t_des - v_tangential) / std::max(dt, 1e-4f);
 
-        // damping to avoid oscillation
+        // damping
         glm::vec3 damping = -dampingK * v_tangential;
 
-        // combine forces: F = m*(a_t + damping) + radialForce + compensate gravity
+        // combine forces: tangential + radial + gravity compensation
         glm::vec3 reqForce = mass * a_t + mass * damping + radialForce - gravityForce;
 
-        // clamp total magnitude
+        // clamp
         reqForce = clampMagnitude(reqForce, maxForce);
 
         totalForce += reqForce;
