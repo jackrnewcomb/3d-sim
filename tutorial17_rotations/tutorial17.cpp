@@ -151,7 +151,7 @@ int main(void)
 
     // Load image
     int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true); // Flip BMP vertically
+    // stbi_set_flip_vertically_on_load(true); // Flip BMP vertically
     unsigned char *data = stbi_load("ff.bmp", &width, &height, &nrChannels, 0);
     if (data)
     {
@@ -220,7 +220,7 @@ int main(void)
     glm::vec3 fieldScale = glm::vec3(5.0f, 0.01f, 3.0f); // wide, thin “floor”
 
     // Yard lines at 0, 25, 50, 25, 0 (like a V formation)
-    std::vector<float> yardLines = {0.0f, 25.0f, 50.0f, 75.0f, 100.0f};
+    std::vector<float> yardLines = {0.0f, 10.0f, 20.0f, 30.0f, 40.0f};
 
     // UAV positions container
     std::vector<glm::vec3> UAVPositions;
@@ -228,10 +228,10 @@ int main(void)
     // Map yard lines to Z coordinates
     for (float yard : yardLines)
     {
-        float zPos = ((yard / 100.0f) * fieldLength) - fieldLength / 2.0f;
-        UAVPositions.push_back(glm::vec3(-fieldWidth / 2.0f, 0.0f, zPos)); // left
+        auto zPos = yard;
+        UAVPositions.push_back(glm::vec3((-fieldWidth / 2.0f) + 1.0f, 0.0f, zPos)); // left
         UAVPositions.push_back(glm::vec3(0.0, 0.0f, zPos));
-        UAVPositions.push_back(glm::vec3(fieldWidth / 2.0f, 0.0f, zPos)); // right
+        UAVPositions.push_back(glm::vec3((fieldWidth / 2.0f) - 1.0f, 0.0f, zPos)); // right
     }
 
     // assuming UAVPositions (std::vector<glm::vec3>) contains 15 start positions
@@ -243,7 +243,7 @@ int main(void)
         u->sphereCenter = glm::vec3(0.0f, 50.0f, 0.0f);
         u->ascendTarget = glm::vec3(0.0f, 50.0f, 0.0f);
 
-        u->start(); // spawns the thread
+        // u->start(); // spawns the thread
         uavs.push_back(std::move(u));
     }
 
@@ -299,7 +299,7 @@ int main(void)
         glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
         // --- Draw football field ---
         glm::mat4 fieldModel = glm::mat4(1.0f);
-        fieldModel = glm::translate(fieldModel, glm::vec3(0.0f, -0.01f, 0.0f)); // slightly below UAVs
+        fieldModel = glm::translate(fieldModel, glm::vec3(0.0f, -0.01f, 20.0f)); // slightly below UAVs
         glm::mat4 fieldMVP = Projection * View * fieldModel;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &fieldMVP[0][0]);
 
