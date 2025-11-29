@@ -38,6 +38,7 @@ struct ECE_UAV
     float maxAscendSpeed = 2.0f;  // m/s (while ascending)
     float minTangentialSpeed = 2.0f;
     float maxTangentialSpeed = 10.0f;
+    bool inSphereMode = false;
 
     float wanderAngle = 0.0f;         // slowly drifting phase
     glm::vec3 wanderDir;              // persistent tangential direction
@@ -205,7 +206,6 @@ inline void ECE_UAV::updatePhysics(float dt, float elapsedSinceStart)
     float distToAscend = glm::length(toAscend);
 
     // We will need to know when sphere-mode starts; implement based on elapsedSinceStart and distance:
-    bool inSphereMode = false;
     if (distToAscend <= (sphereRadius + 0.5f))
     {
         // close enough -> sphere roaming mode

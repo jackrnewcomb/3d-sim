@@ -247,6 +247,9 @@ int main(void)
         uavs.push_back(std::move(u));
     }
 
+    bool startCountdown = false;
+    double countdownStartTime = 0.0;
+
     // Main render loop
     while (!glfwWindowShouldClose(window))
     {
@@ -311,8 +314,13 @@ int main(void)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         // --- Draw chicken OBJ ---
+        bool allInSphereMode = true;
         for (int i = 0; i < uavs.size(); i++)
         {
+            if (!startCountdown && !uavs[i]->inSphereMode)
+            {
+                allInSphereMode = false;
+            }
             glm::vec3 p = uavs[i]->getPosition();
 
             glm::mat4 Model = glm::mat4(1.0f);
@@ -329,6 +337,25 @@ int main(void)
             glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 0.0f, 0.0f);
 
             glDrawArrays(GL_TRIANGLES, 0, verts.size() / 3);
+        }
+
+        if (!startCountdown && allInSphereMode)
+        {
+            startCountdown = true;
+            countdownStartTime = glfwGetTime(); // mark start of 60-second timer
+        }
+
+        if (startCountdown)
+        {
+            double now = glfwGetTime();
+            if (now - countdownStartTime >= 60.0)
+            {
+                // 60 seconds have passed — terminate simulation
+                glfwSetWindowShouldClose(window, true);
+            }
+
+            double remaining = 60.0 - (glfwGetTime() - countdownStartTime);
+            std::cout << "Time remaining: " << remaining << " seconds\r" << std::flush;
         }
 
         // Swap buffers and poll events
