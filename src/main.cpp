@@ -420,8 +420,15 @@ int main(void)
 
             glBindVertexArray(objVAO);
 
+            float t = glfwGetTime();
+            float intensity = 0.75f + 0.25f * sin(2.0f * 3.14159f * 0.5f * t);
+            glm::vec3 baseColor(0.7f, 0.0f, 0.0f);
+
+            // oscillates between 0.5 and 1.0
+            glUniform1f(glGetUniformLocation(programID, "uColorIntensity"), intensity);
             glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
-            glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 0.0f, 0.0f);
+            glUniform1i(glGetUniformLocation(programID, "useOscillation"), 1);
+            glUniform3fv(glGetUniformLocation(programID, "solidColor"), 1, &baseColor[0]);
 
             glDrawArrays(GL_TRIANGLES, 0, verts.size() / 3);
         }
@@ -452,6 +459,7 @@ int main(void)
 
         // solid color or transparent
         glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
+        glUniform1i(glGetUniformLocation(programID, "useOscillation"), 0);
         glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 1.0f, 1.0f); // cyan
 
         // optional: wireframe mode
