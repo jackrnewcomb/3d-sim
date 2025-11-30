@@ -235,11 +235,9 @@ int main(void)
     std::vector<std::unique_ptr<ECE_UAV>> uavs;
     for (int i = 0; i < (int)UAVPositions.size(); ++i)
     {
+        std::cout << "Position " << i << " " << UAVPositions[i].x << " " << UAVPositions[i].y << " "
+                  << UAVPositions[i].z << "\n";
         auto u = std::make_unique<ECE_UAV>(UAVPositions[i]);
-        // optionally set different sphere center if needed:
-        u->sphereCenter = glm::vec3(0.0f, 50.0f, 0.0f);
-        u->ascendTarget = glm::vec3(0.0f, 50.0f, 0.0f);
-
         u->start(); // spawns the thread
         uavs.push_back(std::move(u));
     }
@@ -314,7 +312,7 @@ int main(void)
         bool allInSphereMode = true;
         for (int i = 0; i < uavs.size(); i++)
         {
-            if (!startCountdown && !uavs[i]->inSphereMode)
+            if (!startCountdown && !uavs[i]->getIsInSphereMode())
             {
                 allInSphereMode = false;
             }
