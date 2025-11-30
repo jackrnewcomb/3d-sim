@@ -33,10 +33,7 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
 
     if (elapsedSinceStart < mWaitSeconds)
     {
-        // std::lock_guard<std::mutex> lk(mMtx);
-        // mPosition.z = 0.0f;
-        // mVelocity = glm::vec3(0.0f);
-        // mAcceleration = glm::vec3(0.0f);
+
         return;
     }
 
@@ -46,7 +43,6 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
 
     if (distFromSphere <= mSphereRadius)
     {
-        // close enough -> sphere roaming mode
         mInSphereMode = true;
     }
 
@@ -54,12 +50,12 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
     {
         // ASCEND phase: compute desired velocity towards ascendTarget with maxAscendSpeed
         glm::vec3 dir = (distFromSphere > 1e-6f) ? (toSphere / distFromSphere) : glm::vec3(0.0f, 0.0f, 1.0f);
-        glm::vec3 v_des = dir * mAscentSpeed;
+        glm::vec3 desiredVelocity = dir * mAscentSpeed;
         // desired acceleration to reach v_des in one dt (simple PD-ish)
-        glm::vec3 a_des = (v_des - getVelocity()) / std::max(dt, 1e-4f);
+        glm::vec3 desiredAcceleration = (desiredVelocity - getVelocity()) / std::max(dt, 1e-4f);
 
         // required force = m * a_des + gravity compensation
-        glm::vec3 reqForce = mMass * a_des - gravityForce; // gravity is added separately (see below)
+        glm::vec3 reqForce = mMass * desiredAcceleration - gravityForce; // gravity is added separately (see below)
         // clamp to maxForce magnitude
         reqForce = clampMagnitude(reqForce, mMaxForce);
 
@@ -67,15 +63,47 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
     }
     else
     {
+        // radial vector
+        glm::vec3 radial = glm::normalize(getPosition() - mSphereCenter);
+
+        // random tangent perturbation
+        glm::vec3 randomVec(mDist(mGenerator) - 0.5f, mDist(mGenerator) - 0.5f, mDist(mGenerator) - 0.5f);
+        glm::vec3 tangent = randomVec - glm::dot(randomVec, radial) * radial;
+        tangent = glm::normalize(tangent);
+
+        // desired speed along tangent
+        float speed = glm::clamp(glm::length(getVelocity()), mMinSpeed, mMaxSpeed);
+        glm::vec3 desiredVel = glm::normalize(getVelocity() + 0.1f * tangent) * speed;
+
+        totalForce += mMass * (desiredVel - getVelocity()) / std::max(dt, 1e-4f);
     }
 
     glm::vec3 newAcc = totalForce / mMass;
-
-    // update position using x = x0 + v0*t + 0.5*a*t^2
     glm::vec3 newPos = getPosition() + getVelocity() * dt + 0.5f * newAcc * dt * dt;
-
-    // update velocity v = v0 + a*t
     glm::vec3 newVel = getVelocity() + newAcc * dt;
+
+    // project onto sphere if in sphere mode
+    if (mInSphereMode)
+    {
+        glm::vec3 radial = glm::normalize(newPos - mSphereCenter);
+        newPos = mSphereCenter + radial * mSphereRadius;
+        // make velocity tangent to sphere
+        newVel -= glm::dot(newVel, radial) * radial;
+        float speed = glm::clamp(glm::length(newVel), mMinSpeed, mMaxSpeed);
+        newVel = glm::normalize(newVel) * speed;
+    }
+
+    auto velMag = glm::length(newVel);
+
+    // Quick sanity check that the UAVs are moving at the right speed when traveling up to the sphere
+    if (!mInSphereMode)
+    {
+        auto wiggleRoom = 0.15f;
+        if (velMag > (mAscentSpeed + wiggleRoom))
+        {
+            std::cerr << "An erroneous ascent speed was detected: " << velMag << "\n";
+        }
+    }
 
     // commit state under lock
     {

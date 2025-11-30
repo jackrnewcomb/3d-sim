@@ -98,6 +98,61 @@ int main(void)
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
+    std::vector<glm::vec3> sphereVertices;
+    std::vector<GLuint> sphereIndices;
+    int stacks = 20;      // latitude
+    int slices = 20;      // longitude
+    float radius = 10.0f; // same as UAV sphere
+
+    for (int i = 0; i <= stacks; ++i)
+    {
+        float phi = glm::pi<float>() * i / stacks;
+        for (int j = 0; j <= slices; ++j)
+        {
+            float theta = 2.0f * glm::pi<float>() * j / slices;
+            float x = radius * sin(phi) * cos(theta);
+            float y = radius * cos(phi);
+            float z = radius * sin(phi) * sin(theta);
+            sphereVertices.push_back(glm::vec3(x, y, z));
+        }
+    }
+
+    // generate indices for triangles
+    for (int i = 0; i < stacks; ++i)
+    {
+        for (int j = 0; j < slices; ++j)
+        {
+            int first = i * (slices + 1) + j;
+            int second = first + slices + 1;
+
+            sphereIndices.push_back(first);
+            sphereIndices.push_back(second);
+            sphereIndices.push_back(first + 1);
+
+            sphereIndices.push_back(second);
+            sphereIndices.push_back(second + 1);
+            sphereIndices.push_back(first + 1);
+        }
+    }
+
+    GLuint sphereVAO, sphereVBO, sphereEBO;
+    glGenVertexArrays(1, &sphereVAO);
+    glGenBuffers(1, &sphereVBO);
+    glGenBuffers(1, &sphereEBO);
+
+    glBindVertexArray(sphereVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
+    glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(glm::vec3), sphereVertices.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphereIndices.size() * sizeof(GLuint), sphereIndices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
     // Scale coordinates to match field quad
     // --- Field vertex data ---
     float fieldWidth = 10.0f;  // X-axis width
@@ -352,6 +407,25 @@ int main(void)
             double remaining = 60.0 - (glfwGetTime() - countdownStartTime);
             std::cout << "Time remaining: " << remaining << " seconds\r" << std::flush;
         }
+
+        // model matrix centered at sphere center
+        glm::mat4 sphereModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 50.0f, 0.0f)); // same as mSphereCenter
+        glm::mat4 sphereMVP = Projection * View * sphereModel;
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &sphereMVP[0][0]);
+
+        // solid color or transparent
+        glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
+        glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 1.0f, 1.0f); // cyan
+
+        // optional: wireframe mode
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        glBindVertexArray(sphereVAO);
+        glDrawElements(GL_TRIANGLES, sphereIndices.size(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // reset to fill mode
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         // Swap buffers and poll events
         glfwSwapBuffers(window);
