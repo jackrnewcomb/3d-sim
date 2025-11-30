@@ -49,6 +49,17 @@ class ECE_UAV
         return mStartTime;
     }
 
+    float getSize()
+    {
+        std::lock_guard<std::mutex> lk(mMtx);
+        return mSize;
+    }
+
+    std::mutex &getMutex()
+    {
+        return mMtx;
+    }
+
     void setVelocity(const glm::vec3 &v)
     {
         std::lock_guard<std::mutex> lk(mMtx);

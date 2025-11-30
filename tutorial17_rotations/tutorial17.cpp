@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <mutex>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
@@ -314,6 +315,31 @@ int main(void)
             {
                 glm::vec3 p = uavs[i]->getPosition();
                 // convert simulation coords to your scene coords and draw model at 'p'
+            }
+
+            // do collision checks
+            // UAVPositions = vector of UAVs
+            for (size_t i = 0; i < uavs.size(); ++i)
+            {
+                for (size_t j = i + 1; j < uavs.size(); ++j)
+                {
+                    glm::vec3 posA = uavs[i]->getPosition();
+                    glm::vec3 posB = uavs[j]->getPosition();
+
+                    float dist = glm::length(posA - posB);
+                    float minDist = uavs[i]->getSize() * 0.5f + uavs[j]->getSize() * 0.5f;
+
+                    if (dist < minDist)
+                    {
+                        // collision detected: swap velocities
+                        // lock both UAVs to prevent race conditions
+                        std::unique_lock<std::mutex> lock1(uavs[i]->getMutex(), std::defer_lock);
+                        std::unique_lock<std::mutex> lock2(uavs[j]->getMutex(), std::defer_lock);
+                        std::lock(lock1, lock2); // locks both safely, avoiding deadlock
+
+                        uavs[i]->swapVelocity(*uavs[j]);
+                    }
+                }
             }
         }
 
