@@ -12,13 +12,10 @@ method, and a physics update() method
 
 #pragma once
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/random.hpp>
-#include <iostream>
 #include <mutex>
 #include <random>
 #include <thread>
@@ -147,6 +144,30 @@ class ECE_UAV
     }
 
     /**
+     * @brief The general physics update loop. Performs all calculations to update force, acceleration, velocity, and
+     * position
+     *
+     * @param The time delta
+     * @param How much time has elapsed since simulation start (required for 5 second wait period)
+     */
+    void update(float dt, float elapsedSinceStart);
+
+  private:
+    /**
+     * @brief A random point generator that outputs a random point on the surface of the sphere. Useful in picking paths
+     * for the UAVs
+     */
+    glm::vec3 randomPointOnSphere()
+    {
+        float theta = mDist(mGenerator) * 2.0f * 3.141592; // azimuth
+        float phi = acos(2.0f * mDist(mGenerator) - 1.0f); // inclination
+        float x = mSphereRadius * sin(phi) * cos(theta);
+        float y = mSphereRadius * sin(phi) * sin(theta);
+        float z = mSphereRadius * cos(phi);
+        return glm::vec3(x, y, z);
+    }
+
+    /**
      * @brief Ensures the magnitude of any vector doesn't exceed a maximum (helpful for clamping max ascent velocity and
      * max force)
      *
@@ -162,33 +183,6 @@ class ECE_UAV
             return v;
         float inv = 1.0f / std::sqrt(len2);
         return v * (maxLen * inv);
-    }
-
-    /**
-     * @brief The general physics update loop. Performs all calculations to update force, acceleration, velocity, and
-     * position
-     *
-     * @param The time delta
-     * @param How much time has elapsed since simulation start (required for 5 second wait period)
-     */
-    void update(float dt, float elapsedSinceStart);
-
-  private:
-    /**
-     * @brief A random point generator that outputs a random point on the surface of the sphere. Useful in picking paths
-     * for the UAVs
-     *
-     * @param The time delta
-     * @param How much time has elapsed since simulation start (required for 5 second wait period)
-     */
-    glm::vec3 randomPointOnSphere(float radius, std::mt19937 &gen, std::uniform_real_distribution<float> &dist)
-    {
-        float theta = dist(gen) * 2.0f * 3.141592; // azimuth
-        float phi = acos(2.0f * dist(gen) - 1.0f); // inclination
-        float x = radius * sin(phi) * cos(theta);
-        float y = radius * sin(phi) * sin(theta);
-        float z = radius * cos(phi);
-        return glm::vec3(x, y, z);
     }
 
     // Physical parameters

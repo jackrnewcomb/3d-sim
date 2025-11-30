@@ -89,7 +89,7 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
         // If close to target or timer expired, pick a new target
         if (dist < 0.1f)
         {
-            mSphereTarget = mSphereCenter + randomPointOnSphere(mSphereRadius, mGenerator, mDist);
+            mSphereTarget = mSphereCenter + randomPointOnSphere();
             mSphereSpeed = glm::linearRand(mMinSpeed, mMaxSpeed);
         }
     }
@@ -107,18 +107,6 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
         newVel -= glm::dot(newVel, radial) * radial;
         float speed = glm::clamp(glm::length(newVel), mMinSpeed, mMaxSpeed);
         newVel = glm::normalize(newVel) * speed;
-    }
-
-    auto velMag = glm::length(newVel);
-
-    // Quick sanity check that the UAVs are moving at the right speed when traveling up to the sphere
-    if (!mInSphereMode)
-    {
-        auto wiggleRoom = 0.15f;
-        if (velMag > (mAscentSpeed + wiggleRoom))
-        {
-            std::cerr << "An erroneous ascent speed was detected: " << velMag << "\n";
-        }
     }
 
     // commit state under lock
