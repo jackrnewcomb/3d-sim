@@ -422,7 +422,7 @@ int main(void)
 
             float t = glfwGetTime();
             float intensity = 0.75f + 0.25f * sin(2.0f * 3.14159f * 0.5f * t);
-            glm::vec3 baseColor(0.7f, 0.0f, 0.0f);
+            glm::vec3 baseColor(1.0, 0.5, 0.0);
 
             // oscillates between 0.5 and 1.0
             glUniform1f(glGetUniformLocation(programID, "uColorIntensity"), intensity);

@@ -63,19 +63,23 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
     }
     else
     {
-        // radial vector
-        glm::vec3 radial = glm::normalize(getPosition() - mSphereCenter);
+        glm::vec3 toTarget = mSphereTarget - getPosition();
+        float dist = glm::length(toTarget);
 
-        // random tangent perturbation
-        glm::vec3 randomVec(mDist(mGenerator) - 0.5f, mDist(mGenerator) - 0.5f, mDist(mGenerator) - 0.5f);
-        glm::vec3 tangent = randomVec - glm::dot(randomVec, radial) * radial;
-        tangent = glm::normalize(tangent);
+        glm::vec3 desiredVel = glm::normalize(toTarget) * mSphereSpeed;
 
-        // desired speed along tangent
-        float speed = glm::clamp(glm::length(getVelocity()), mMinSpeed, mMaxSpeed);
-        glm::vec3 desiredVel = glm::normalize(getVelocity() + 0.1f * tangent) * speed;
+        // simple acceleration
+        glm::vec3 desiredAcc = (desiredVel - getVelocity()) / std::max(dt, 1e-4f);
+        glm::vec3 reqForce = clampMagnitude(mMass * desiredAcc, mMaxForce);
 
-        totalForce += mMass * (desiredVel - getVelocity()) / std::max(dt, 1e-4f);
+        totalForce += reqForce;
+
+        // If close to target or timer expired, pick a new target
+        if (dist < 0.1f)
+        {
+            mSphereTarget = mSphereCenter + randomPointOnSphere(mSphereRadius, mGenerator, mDist);
+            mSphereSpeed = glm::linearRand(mMinSpeed, mMaxSpeed);
+        }
     }
 
     glm::vec3 newAcc = totalForce / mMass;

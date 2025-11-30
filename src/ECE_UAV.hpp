@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <glm/glm.hpp>
+#include <glm/gtc/random.hpp>
 #include <iostream>
 #include <mutex>
 #include <random>
@@ -116,6 +117,19 @@ class ECE_UAV
     std::uniform_real_distribution<float> mDist{0.0f, 1.0f};
 
     std::chrono::steady_clock::time_point mStartTime;
+
+    glm::vec3 randomPointOnSphere(float radius, std::mt19937 &gen, std::uniform_real_distribution<float> &dist)
+    {
+        float theta = dist(gen) * 2.0f * 3.141592; // azimuth
+        float phi = acos(2.0f * dist(gen) - 1.0f); // inclination
+        float x = radius * sin(phi) * cos(theta);
+        float y = radius * sin(phi) * sin(theta);
+        float z = radius * cos(phi);
+        return glm::vec3(x, y, z);
+    }
+
+    glm::vec3 mSphereTarget; // current point on the sphere
+    float mSphereSpeed;      // speed to move along sphere
 };
 
 void threadFunction(ECE_UAV *uav);
