@@ -14,22 +14,26 @@ that workers will call to update the sim
 
 ECE_UAV::ECE_UAV(const glm::vec3 &startPos)
 {
+    // Initialize the position
     mPosition = startPos;
 }
 
 void ECE_UAV::start()
 {
+    // set isRunning and assign the worker to threadFunction
     mIsRunning.store(true);
     mWorker = std::thread(threadFunction, this);
 }
 
 void ECE_UAV::stop()
 {
+    // set isRunning to false
     mIsRunning.store(false);
 }
 
 void ECE_UAV::join()
 {
+    // join, if joinable
     if (mWorker.joinable())
     {
         mWorker.join();
@@ -38,55 +42,61 @@ void ECE_UAV::join()
 
 void ECE_UAV::update(float dt, float elapsedSinceStart)
 {
-
+    // Initialize the total force to 0, we'll append to it shortly
     glm::vec3 totalForce(0.0f);
 
+    // get gravity vector
     glm::vec3 gravityForce = glm::vec3(0.0f, 0.0f, mGravity);
 
+    // If we are on the ground for the first 5 seconds, no movement, just return
     if (elapsedSinceStart < mWaitSeconds)
     {
-
         return;
-    }
-
-    // compute vector to ascend target
-    glm::vec3 toSphere = mSphereCenter - getPosition();
-    float distFromSphere = glm::length(toSphere);
-
-    if (distFromSphere <= mSphereRadius)
-    {
-        mInSphereMode = true;
     }
 
     if (!mInSphereMode)
     {
-        // ASCEND phase: compute desired velocity towards ascendTarget with maxAscendSpeed
+        // Check if we've entered the sphere, and update mInSphereMode accordingly
+        glm::vec3 toSphere = mSphereCenter - getPosition();
+        float distFromSphere = glm::length(toSphere);
+        if (distFromSphere <= mSphereRadius)
+        {
+            mInSphereMode = true;
+        }
+
+        // Get the desired velocity, force, and acceleration vectors to ascend toward the sphere
         glm::vec3 dir = (distFromSphere > 1e-6f) ? (toSphere / distFromSphere) : glm::vec3(0.0f, 0.0f, 1.0f);
         glm::vec3 desiredVelocity = dir * mAscentSpeed;
-        // desired acceleration to reach v_des in one dt (simple PD-ish)
         glm::vec3 desiredAcceleration = (desiredVelocity - getVelocity()) / std::max(dt, 1e-4f);
-
-        // required force = m * a_des + gravity compensation
         glm::vec3 reqForce = mMass * desiredAcceleration - gravityForce; // gravity is added separately (see below)
-        // clamp to maxForce magnitude
+
+        // clamp to mMaxForce (can't exceed 20N)
         reqForce = clampMagnitude(reqForce, mMaxForce);
 
+        // Apply the resultant force
         totalForce += reqForce;
     }
     else
     {
+        // Now that we're in sphere mode, our basic strategy is to randomly select a point on the sphere to travel to,
+        // and a velocity between 2-10 m/s. We will travel toward that point, with that velocity, until we reach it,
+        // then repeat
+
+        // Get the vector/distance magnitude to the randomly selected target point
         glm::vec3 toTarget = mSphereTarget - getPosition();
         float dist = glm::length(toTarget);
 
+        // Determine the desired velocity
         glm::vec3 desiredVel = glm::normalize(toTarget) * mSphereSpeed;
 
-        // simple acceleration
+        // determine the resultant acceleration and force
         glm::vec3 desiredAcc = (desiredVel - getVelocity()) / std::max(dt, 1e-4f);
         glm::vec3 reqForce = clampMagnitude(mMass * desiredAcc, mMaxForce);
 
+        // Apply the resultant force
         totalForce += reqForce;
 
-        // If close to target or timer expired, pick a new target
+        // If we reached the point we were traveling to, get a new point and velocity
         if (dist < 0.1f)
         {
             mSphereTarget = mSphereCenter + randomPointOnSphere();
@@ -94,22 +104,25 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
         }
     }
 
+    // Get new acceleration, position, and velocity from the force we just calculated
     glm::vec3 newAcc = totalForce / mMass;
     glm::vec3 newPos = getPosition() + getVelocity() * dt + 0.5f * newAcc * dt * dt;
     glm::vec3 newVel = getVelocity() + newAcc * dt;
 
-    // project onto sphere if in sphere mode
+    // If we're in sphere mode, we need to make alterations to ensure the UAV remains on the surface of the sphere
     if (mInSphereMode)
     {
+        // Ensure position is on the sphere surface
         glm::vec3 radial = glm::normalize(newPos - mSphereCenter);
         newPos = mSphereCenter + radial * mSphereRadius;
+
         // make velocity tangent to sphere
         newVel -= glm::dot(newVel, radial) * radial;
         float speed = glm::clamp(glm::length(newVel), mMinSpeed, mMaxSpeed);
         newVel = glm::normalize(newVel) * speed;
     }
 
-    // commit state under lock
+    // commit new physical state
     {
         std::lock_guard<std::mutex> lk(mMtx);
         mPosition = newPos;
