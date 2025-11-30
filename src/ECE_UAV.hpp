@@ -154,7 +154,7 @@ class ECE_UAV
     }
 
     glm::vec3 mSphereTarget; // current point on the sphere
-    float mSphereSpeed{0.0}; // speed to move along sphere
+    float mSphereSpeed;      // speed to move along sphere
 };
 
 void threadFunction(ECE_UAV *uav);
