@@ -1,3 +1,14 @@
+/*
+Author: Jack Newcomb
+Class: ECE6122
+Last Date Modified: 11/30/2025
+
+Description:
+
+The main execution. Largely handles all GLEW and GLFW needs, along with maintenence of the vector of ECE_UAV objects
+
+*/
+
 #include "common/objloader.hpp"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>

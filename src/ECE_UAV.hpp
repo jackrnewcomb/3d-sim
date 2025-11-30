@@ -1,3 +1,15 @@
+/*
+Author: Jack Newcomb
+Class: ECE6122
+Last Date Modified: 11/30/2025
+
+Description:
+
+Header for the ECE_UAV class. Provides thread-safe getters and setters for relevant members, the requested start()
+method, and a physics update() method
+
+*/
+
 #pragma once
 
 #include <algorithm>
@@ -14,13 +26,26 @@
 class ECE_UAV
 {
   public:
+    /**
+     * @brief The ECE_UAV constructor. Takes in a starting position
+     *
+     * @param glm::vec3 initial position
+     */
     ECE_UAV(const glm::vec3 &startPos);
 
-    // Start the internal thread (calls external threadFunction per spec)
+    /**
+     * @brief Starts the UAV execution by assigning the std::thread worker to threadFunction
+     */
     void start();
 
-    // Request stop and join
+    /**
+     * @brief Stops the UAV execution, sets member mIsRunning to false
+     */
     void stop();
+
+    /**
+     * @brief Starts the UAV execution by assigning the std::thread worker to threadFunction
+     */
     void join();
 
     glm::vec3 getPosition()
@@ -129,7 +154,7 @@ class ECE_UAV
     }
 
     glm::vec3 mSphereTarget; // current point on the sphere
-    float mSphereSpeed;      // speed to move along sphere
+    float mSphereSpeed{0.0}; // speed to move along sphere
 };
 
 void threadFunction(ECE_UAV *uav);

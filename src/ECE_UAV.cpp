@@ -1,3 +1,15 @@
+/*
+Author: Jack Newcomb
+Class: ECE6122
+Last Date Modified: 11/30/2025
+
+Description:
+
+Implementation for the ECE_UAV class. Provides the physics update loop implementation, as well as the threadFunction
+that workers will call to update the sim
+
+*/
+
 #include "ECE_UAV.hpp"
 
 ECE_UAV::ECE_UAV(const glm::vec3 &startPos)
