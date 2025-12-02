@@ -176,7 +176,7 @@ class ECE_UAV
      *
      * @returns Output vector
      */
-    glm::vec3 clampMagnitude(const glm::vec3 &v, float maxLen)
+    glm::vec3 fixMagnitude(const glm::vec3 &v, float maxLen)
     {
         float len2 = glm::dot(v, v);
         if (len2 <= maxLen * maxLen)

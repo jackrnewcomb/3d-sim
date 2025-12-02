@@ -68,10 +68,10 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
         glm::vec3 dir = (distFromSphere > 1e-6f) ? (toSphere / distFromSphere) : glm::vec3(0.0f, 0.0f, 1.0f);
         glm::vec3 desiredVelocity = dir * mAscentSpeed;
         glm::vec3 desiredAcceleration = (desiredVelocity - getVelocity()) / std::max(dt, 1e-4f);
-        glm::vec3 reqForce = mMass * desiredAcceleration - gravityForce; // gravity is added separately (see below)
+        glm::vec3 reqForce = mMass * desiredAcceleration - gravityForce; // gravity is added separately
 
         // clamp to mMaxForce (can't exceed 20N)
-        reqForce = clampMagnitude(reqForce, mMaxForce);
+        reqForce = fixMagnitude(reqForce, mMaxForce);
 
         // Apply the resultant force
         totalForce += reqForce;
@@ -91,7 +91,7 @@ void ECE_UAV::update(float dt, float elapsedSinceStart)
 
         // determine the resultant acceleration and force
         glm::vec3 desiredAcc = (desiredVel - getVelocity()) / std::max(dt, 1e-4f);
-        glm::vec3 reqForce = clampMagnitude(mMass * desiredAcc, mMaxForce);
+        glm::vec3 reqForce = fixMagnitude(mMass * desiredAcc, mMaxForce);
 
         // Apply the resultant force
         totalForce += reqForce;
@@ -135,7 +135,7 @@ void threadFunction(ECE_UAV *pUAV)
 {
     // Worker will run with 10 ms updates
     using clock = std::chrono::steady_clock;
-    const std::chrono::milliseconds dt_ms(10);
+    const std::chrono::milliseconds dtMs(10);
     pUAV->setTime(clock::now());
     auto last = clock::now();
 
@@ -154,7 +154,7 @@ void threadFunction(ECE_UAV *pUAV)
         // call update
         pUAV->update(dt, timeSinceStart);
 
-        // sleep to hit ~10ms update rate
-        std::this_thread::sleep_for(dt_ms);
+        // sleep to hit 10ms update rate
+        std::this_thread::sleep_for(dtMs);
     }
 }
