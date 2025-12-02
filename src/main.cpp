@@ -36,7 +36,14 @@ float sensitivity = 0.1f;
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+/**
+ * @brief Provides handling for mouse input to adjust camera angle
+ *
+ * @param window
+ * @param x position
+ * @param y position
+ */
+void mouseCallback(GLFWwindow *window, double xpos, double ypos)
 {
     if (firstMouse)
     {
@@ -46,7 +53,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed: y-coordinates go bottom -> top
+    float yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
@@ -69,6 +76,9 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     cameraFront = glm::normalize(front);
 }
 
+/**
+ * @brief Main execution
+ */
 int main(void)
 {
     // Initialize GLFW
@@ -83,6 +93,7 @@ int main(void)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+    // Make the window
     window = glfwCreateWindow(800, 600, "BMP Texture Rectangle", NULL, NULL);
     if (!window)
     {
@@ -92,6 +103,7 @@ int main(void)
     }
     glfwMakeContextCurrent(window);
 
+    // GLEW initializer
     glewExperimental = true;
     if (glewInit() != GLEW_OK)
     {
@@ -99,23 +111,23 @@ int main(void)
         return -1;
     }
 
-    // after glewInit()
+    // Frame buffer things
     int fbWidth, fbHeight;
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
 
-    // set a visible clear color so white screen is obvious
+    // Set background color
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
+    // Do some work for defining transparent sphere parameters
     std::vector<glm::vec3> sphereVertices;
     std::vector<GLuint> sphereIndices;
-    int stacks = 20;      // latitude
-    int slices = 20;      // longitude
-    float radius = 10.0f; // same as UAV sphere
-
+    int stacks = 20;
+    int slices = 20;
+    float radius = 10.0f; // 10m radius
     for (int i = 0; i <= stacks; ++i)
     {
         float phi = glm::pi<float>() * i / stacks;
@@ -147,6 +159,7 @@ int main(void)
         }
     }
 
+    // Sphere vertex things
     GLuint sphereVAO, sphereVBO, sphereEBO;
     glGenVertexArrays(1, &sphereVAO);
     glGenBuffers(1, &sphereVBO);
@@ -165,19 +178,17 @@ int main(void)
 
     glBindVertexArray(0);
 
-    // Scale coordinates to match field quad
-    // --- Field vertex data ---
+    // Need to do some work to construct the field. Start with length and width
     float fieldWidth = 10.0f;  // X-axis width
     float fieldLength = 50.0f; // Z-axis length
     GLfloat fieldVertices[] = {
-        // X, Y, Z,  U, V
         -fieldWidth / 2, 0.0f, -fieldLength / 2, 0.0f, 0.0f, fieldWidth / 2,  0.0f, -fieldLength / 2, 1.0f, 0.0f,
         fieldWidth / 2,  0.0f, fieldLength / 2,  1.0f, 1.0f, -fieldWidth / 2, 0.0f, fieldLength / 2,  0.0f, 1.0f,
     };
 
     GLuint fieldIndices[] = {0, 1, 2, 2, 3, 0};
 
-    // --- Field VAO/VBO/EBO ---
+    // Construct field vertex arrays, buffers, etc
     GLuint fieldVAO, fieldVBO, fieldEBO;
     glGenVertexArrays(1, &fieldVAO);
     glGenBuffers(1, &fieldVBO);
@@ -191,34 +202,32 @@ int main(void)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fieldEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(fieldIndices), fieldIndices, GL_STATIC_DRAW);
 
-    // position
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    // UV
+
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
 
-    // Load shaders (use your tutorial shader files)
+    // Load our shaders
     GLuint programID = LoadShaders("StandardShading.vertexshader", "StandardShading.fragmentshader");
-    // immediate check after LoadShaders(...)
     if (programID == 0)
     {
         fprintf(stderr, "Shader program failed to load (programID == 0)\n");
         return -1;
     }
 
-    glfwSetCursorPosCallback(window, mouse_callback);
+    // Setup mouse callback for mouse camera angle movement
+    glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // hide & capture cursor
 
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    // Load image
+    // Load football field bmp using stbi
     int width, height, nrChannels;
-    // stbi_set_flip_vertically_on_load(true); // Flip BMP vertically
     unsigned char *data = stbi_load("ff.bmp", &width, &height, &nrChannels, 0);
     if (data)
     {
@@ -229,18 +238,14 @@ int main(void)
         fprintf(stderr, "Failed to load texture (data == NULL)\n");
     }
 
-    /*
-    Load and handle OBJ
-    */
+    // Load uav obj (chicken)
     std::vector<float> verts, uvs, norms;
-
     if (!loadOBJ("chicken_01.obj", verts, uvs, norms))
     {
         printf("OBJ load failed!\n");
     }
 
     glm::vec3 minV(FLT_MAX), maxV(-FLT_MAX);
-
     for (auto &v : verts)
     {
         minV = glm::min(minV, v);
@@ -291,16 +296,13 @@ int main(void)
 
     float cameraSpeed = 7.0f; // units per second
 
-    // --- BEFORE the main loop ---
     GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 
-    // Yard lines at 0, 25, 50, 25, 0 (like a V formation)
     std::vector<float> yardLines = {0.0f, 10.0f, 20.0f, 30.0f, 40.0f};
 
     // UAV positions container
     std::vector<glm::vec3> UAVPositions;
 
-    // Map yard lines to Z coordinates
     for (float yard : yardLines)
     {
         auto zPos = yard;
@@ -309,13 +311,13 @@ int main(void)
         UAVPositions.push_back(glm::vec3((fieldWidth / 2.0f) - 1.0f, 0.0f, zPos)); // right
     }
 
-    // assuming UAVPositions (std::vector<glm::vec3>) contains 15 start positions
+    // Generate the collection of uavs, and call start() on each
     std::vector<std::unique_ptr<ECE_UAV>> uavs;
     for (int i = 0; i < (int)UAVPositions.size(); ++i)
     {
-        auto u = std::make_unique<ECE_UAV>(UAVPositions[i]);
-        u->start(); // spawns the thread
-        uavs.push_back(std::move(u));
+        auto newUav = std::make_unique<ECE_UAV>(UAVPositions[i]);
+        newUav->start();
+        uavs.push_back(std::move(newUav));
     }
 
     bool startCountdown = false;
@@ -324,21 +326,21 @@ int main(void)
     // Main render loop
     while (!glfwWindowShouldClose(window))
     {
-        // in your rendering loop (run at whatever frame-rate you like)
+        // Some handling for polling. Check the last poll time and current time, and do an update if the difference is
+        // over 30 ms
         static double lastPoll = glfwGetTime();
         double now = glfwGetTime();
         if (now - lastPoll >= 0.03)
-        { // 30 ms
+        {
+            // Update lastPoll and get uav positions
             lastPoll = now;
-            // read positions (thread-safe)
             for (size_t i = 0; i < uavs.size(); ++i)
             {
                 glm::vec3 p = uavs[i]->getPosition();
-                // convert simulation coords to your scene coords and draw model at 'p'
             }
 
             // do collision checks
-            // UAVPositions = vector of UAVs
+            // For each uav, see if any of the other uavs is close enough to hit it
             for (size_t i = 0; i < uavs.size(); ++i)
             {
                 for (size_t j = i + 1; j < uavs.size(); ++j)
@@ -355,7 +357,7 @@ int main(void)
                         // lock both UAVs to prevent race conditions
                         std::unique_lock<std::mutex> lock1(uavs[i]->getMutex(), std::defer_lock);
                         std::unique_lock<std::mutex> lock2(uavs[j]->getMutex(), std::defer_lock);
-                        std::lock(lock1, lock2); // locks both safely, avoiding deadlock
+                        std::lock(lock1, lock2); // needed to lock both safely
 
                         uavs[i]->swapVelocity(*uavs[j]);
                     }
@@ -363,6 +365,7 @@ int main(void)
             }
         }
 
+        // Set camera front
         glm::vec3 front;
         front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
         front.y = sin(glm::radians(pitch));
@@ -375,6 +378,7 @@ int main(void)
 
         float velocity = cameraSpeed * deltaTime;
 
+        // Key handling to allow for moving around the map
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             cameraPos += velocity * cameraFront;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -392,16 +396,16 @@ int main(void)
         // Use shader program
         glUseProgram(programID);
 
-        // --- Compute camera matrices ---
-        // --- Compute View & Projection ---
         glm::mat4 View = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-        // --- Draw football field ---
+
+        // Lets draw the football field
         glm::mat4 fieldModel = glm::mat4(1.0f);
         fieldModel = glm::translate(fieldModel, glm::vec3(0.0f, -0.01f, 20.0f)); // slightly below UAVs
         glm::mat4 fieldMVP = Projection * View * fieldModel;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &fieldMVP[0][0]);
 
+        // Bind solid color to football field (see shader code for handling of useSolidColor)
         glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -409,21 +413,22 @@ int main(void)
         glBindVertexArray(fieldVAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-        // --- Draw chicken OBJ ---
+        // Check if all uavs have entered sphere mode
         bool allInSphereMode = true;
         for (int i = 0; i < uavs.size(); i++)
         {
             if (!startCountdown && !uavs[i]->getIsInSphereMode())
             {
+                // If any of them aren't in sphere mode, we don't enter the 60 second waiting period yet
                 allInSphereMode = false;
             }
-            glm::vec3 p = uavs[i]->getPosition();
+            glm::vec3 position = uavs[i]->getPosition();
 
             glm::mat4 Model = glm::mat4(1.0f);
-            Model = glm::translate(Model, p);
-            auto scale_factor = uavs[i]->getSize() / maxDim;
+            Model = glm::translate(Model, position);
+            auto scalingFactor = uavs[i]->getSize() / maxDim;
 
-            Model = glm::scale(Model, glm::vec3(scale_factor));
+            Model = glm::scale(Model, glm::vec3(scalingFactor));
             Model = glm::rotate(Model, glm::radians(180.0f), glm::vec3(0, 1, 0));
 
             glm::mat4 MVP = Projection * View * Model;
@@ -431,9 +436,11 @@ int main(void)
 
             glBindVertexArray(objVAO);
 
+            // Some handling for uav color oscillation. We want intensity to be at 0.5 hertz, so get time and apply 2pi
+            // * 0.5
             float t = glfwGetTime();
             float intensity = 0.75f + 0.25f * sin(2.0f * 3.14159f * 0.5f * t);
-            glm::vec3 baseColor(1.0, 0.5, 0.0);
+            glm::vec3 baseColor(1.0, 0.5, 0.0); // orange (arbitrary)
 
             // oscillates between 0.5 and 1.0
             glUniform1f(glGetUniformLocation(programID, "uColorIntensity"), intensity);
@@ -441,9 +448,11 @@ int main(void)
             glUniform1i(glGetUniformLocation(programID, "useOscillation"), 1);
             glUniform3fv(glGetUniformLocation(programID, "solidColor"), 1, &baseColor[0]);
 
+            // Draw
             glDrawArrays(GL_TRIANGLES, 0, verts.size() / 3);
         }
 
+        // If we are all in sphere mode, start the timer
         if (!startCountdown && allInSphereMode)
         {
             startCountdown = true;
@@ -455,32 +464,34 @@ int main(void)
             double now = glfwGetTime();
             if (now - countdownStartTime >= 60.0)
             {
-                // 60 seconds have passed — terminate simulation
+                // 60 seconds have passed, terminate sim
                 glfwSetWindowShouldClose(window, true);
             }
 
+            // print time remaining to console
             double remaining = 60.0 - (glfwGetTime() - countdownStartTime);
             std::cout << "Time remaining: " << remaining << " seconds\r" << std::flush;
         }
 
-        // model matrix centered at sphere center
+        // draw the sphere
         glm::mat4 sphereModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 50.0f, 0.0f)); // same as mSphereCenter
         glm::mat4 sphereMVP = Projection * View * sphereModel;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &sphereMVP[0][0]);
 
-        // solid color or transparent
+        // set some shader conditions to make sure we get solid coloring on the sphere
         glUniform1i(glGetUniformLocation(programID, "useSolidColor"), 1);
         glUniform1i(glGetUniformLocation(programID, "useOscillation"), 0);
-        glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 1.0f, 1.0f); // cyan
+        glUniform3f(glGetUniformLocation(programID, "solidColor"), 0.0f, 1.0f, 1.0f); // blue, arbitrary
 
-        // optional: wireframe mode
+        // wireframe
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+        // Draw sphere
         glBindVertexArray(sphereVAO);
         glDrawElements(GL_TRIANGLES, sphereIndices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
-        // reset to fill mode
+        // need to reset this
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         // Swap buffers and poll events
@@ -488,10 +499,13 @@ int main(void)
         glfwPollEvents();
     }
 
+    // Once sim is over, stop() all uavs
     for (auto &u : uavs)
     {
         u->stop();
     }
+
+    // join threads
     for (auto &u : uavs)
     {
         u->join();
