@@ -62,6 +62,12 @@ cmake --build .
 
 After building, run the executable `drone-show.exe`.
 
+---
+
 ## Demo 
 
 Below is a brief demonstration of the show.
+
+https://github.com/user-attachments/assets/b25332a9-93f2-4e81-ae0b-13d83c767b75
+
+
