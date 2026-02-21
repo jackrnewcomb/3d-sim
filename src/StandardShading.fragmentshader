@@ -1,0 +1,25 @@
+#version 330 core
+
+in vec2 UV;
+
+uniform bool useSolidColor;
+uniform vec3 solidColor;
+uniform sampler2D myTextureSampler;
+uniform bool useOscillation;
+uniform float uColorIntensity;
+
+
+out vec4 color;
+
+void main() {
+    if (useSolidColor) {
+        if (useOscillation) {
+            vec3 finalColor = solidColor * uColorIntensity;
+            color = vec4(finalColor, 1.0);
+        } else {
+            color = vec4(solidColor, 1.0);
+        }
+    }
+    else
+        color = texture(myTextureSampler, UV);
+}
