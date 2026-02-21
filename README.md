@@ -60,7 +60,7 @@ cmake --build .
 
 ## Usage 
 
-After building, run the executable `drone-show.exe`.
+After building, run the executable `UavSimulation.exe`.
 
 ---
 
